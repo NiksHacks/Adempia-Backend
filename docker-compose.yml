@@ -1,0 +1,19 @@
+# Local orchestration of the Adempia backend services.
+# Production: deploy each service to Railway (see README.md).
+services:
+  ocr:
+    build: ./services/ocr
+    environment:
+      - PORT=8000
+    ports:
+      - "8000:8000"
+
+  api:
+    build: ./services/api
+    environment:
+      - PORT=8080
+      - OCR_SERVICE_URL=http://ocr:8000
+    ports:
+      - "8080:8080"
+    depends_on:
+      - ocr
