@@ -25,7 +25,10 @@ Variabili d'ambiente richieste:
 - `BETTER_AUTH_URL` — URL pubblico del backend (base URL Better Auth)
 - `FRONTEND_URL` — URL pubblico del frontend (trusted origin)
 - `ENCRYPTION_KEY` — 32 byte hex per cifrare le credenziali Alloggiati a riposo
-- `ALLOGGIATI_MODE` — `mock` (default, nessuna chiamata alla Questura) o `live` (SOAP reale)
+
+L'integrazione Alloggiati Web usa sempre l'adapter SOAP reale verso
+`alloggiatiweb.poliziadistato.it`: ogni operazione richiede le credenziali Questura
+(Utente, Password, WSKEY) salvate dalla pagina Collega.
 
 ## Autenticazione
 
@@ -48,7 +51,7 @@ l'organizzazione dell'utente.
 ### Auth & sessione
 
 - `ALL  /api/auth/*` — Better Auth (sign-up, sign-in, sign-out, session)
-- `GET  /api/session` — utente + organizzazione correnti, modalità Alloggiati
+- `GET  /api/session` — utente + organizzazione correnti
 
 ### Dominio (richiedono sessione)
 
@@ -60,7 +63,7 @@ l'organizzazione dell'utente.
 - `POST   /api/stays/:id/check-in-token` — genera/recupera il token del link check-in
 - `POST   /api/stays/:id/tax-collected` — segna la tassa di soggiorno come riscossa
 - `GET    /api/invio` — schedine pronte/errori + ricevute
-- `POST   /api/invio/send` — `{ stayIds: [...] }` → trasmissione Alloggiati (mock o SOAP) + ricevuta PDF
+- `POST   /api/invio/send` — `{ stayIds: [...] }` → trasmissione SOAP ad Alloggiati + ricevuta PDF ufficiale
 - `GET    /api/receipts/:id/pdf` — download ricevuta
 - `GET    /api/alloggiati/status` — stato credenziali, onboarding, appartamenti da abbinare
 - `POST   /api/alloggiati/credentials` — salva credenziali cifrate + test di collegamento + sync appartamenti

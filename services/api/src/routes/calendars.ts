@@ -1,7 +1,6 @@
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import { prisma } from "../db.js";
-import { getAlloggiatiMode } from "../lib/alloggiati/mode.js";
 import { ALLOGGIATI_SOAP_ENDPOINT } from "../lib/alloggiati/protocol.js";
 import { syncChannelCalendar } from "../lib/channels/sync.js";
 import { requireOrganization } from "../plugins/session.js";
@@ -41,7 +40,6 @@ export function registerCalendarRoutes(app: FastifyInstance): void {
 
     return reply.send({
       connected: credential?.lastTestOk === true,
-      mode: getAlloggiatiMode(),
       soapEndpoint: ALLOGGIATI_SOAP_ENDPOINT,
       properties: properties.map((p) => ({ id: p.id, name: p.name })),
       calendars,

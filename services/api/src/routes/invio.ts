@@ -2,9 +2,8 @@ import type { FastifyInstance } from "fastify";
 import type { GuestStay, Property } from "@prisma/client";
 import { z } from "zod";
 import { prisma } from "../db.js";
-import { getAlloggiatiClient, getAlloggiatiMode } from "../lib/alloggiati/index.js";
+import { getAlloggiatiClient } from "../lib/alloggiati/index.js";
 import { buildSchedinaRow } from "../lib/alloggiati/schedina.js";
-import { buildMockRicevutaPdf } from "../lib/alloggiati/ricevuta-pdf.js";
 import {
   esitoToMessage,
   type AlloggiatiClient,
@@ -229,34 +228,38 @@ export function registerInvioRoutes(app: FastifyInstance): void {
       }
 
       const issuedAt = new Date();
-      const protocol = `AW-${issuedAt.toISOString().slice(0, 10).replaceAll("-", "")}-${stays.length}`;
-      let pdfBytes = await buildMockRicevutaPdf({
-        protocol,
-        issuedAt,
-        guests: stays.map((stay) => ({
-          lastName: stay.lastName,
-          firstName: stay.firstName,
-          arrivalDate: stay.arrivalDate,
-        })),
-      });
 
-      if (getAlloggiatiMode() === "live") {
+      // Le schedine risultano già trasmesse: scarichiamo la ricevuta ufficiale.
+      // Se la chiamata Ricevuta fallisce, i soggiorni restano "sent" e la
+      // ricevuta va riscaricata dal portale Alloggiati.
+      let pdfBytes: Uint8Array<ArrayBuffer> | null = null;
+      let receiptWarning: string | null = null;
+      try {
         const ricevuta = await client.ricevuta(session, issuedAt);
         if (ricevuta.result.esito && ricevuta.pdfBase64) {
-          pdfBytes = Buffer.from(ricevuta.pdfBase64, "base64");
+          pdfBytes = new Uint8Array(Buffer.from(ricevuta.pdfBase64, "base64"));
+        } else {
+          receiptWarning =
+            ricevuta.result.erroreDes || "Ricevuta PDF non restituita da Alloggiati.";
         }
+      } catch (error) {
+        receiptWarning =
+          error instanceof Error ? error.message : "Download ricevuta non riuscito.";
       }
 
       const receiptIds: string[] = [];
       for (const stay of stays) {
-        const receipt = await prisma.receipt.create({
-          data: {
-            stayId: stay.id,
-            organizationId: ctx.organization.id,
-            pdfBytes: Buffer.from(pdfBytes),
-            issuedAt,
-          },
-        });
+        if (pdfBytes) {
+          const receipt = await prisma.receipt.create({
+            data: {
+              stayId: stay.id,
+              organizationId: ctx.organization.id,
+              pdfBytes,
+              issuedAt,
+            },
+          });
+          receiptIds.push(receipt.id);
+        }
         await prisma.guestStay.update({
           where: { id: stay.id },
           data: {
@@ -265,12 +268,13 @@ export function registerInvioRoutes(app: FastifyInstance): void {
             errorMessage: null,
           },
         });
-        receiptIds.push(receipt.id);
       }
 
       return reply.send({
         ok: true,
-        message: `Trasmesse ${stays.length} schedine.`,
+        message: receiptWarning
+          ? `Trasmesse ${stays.length} schedine. Ricevuta non scaricata: ${receiptWarning}`
+          : `Trasmesse ${stays.length} schedine.`,
         receiptIds,
       });
     } catch (error) {

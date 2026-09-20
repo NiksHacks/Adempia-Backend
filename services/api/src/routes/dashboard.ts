@@ -1,7 +1,6 @@
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import { prisma } from "../db.js";
-import { getAlloggiatiMode } from "../lib/alloggiati/mode.js";
 import {
   buildStayChecklist,
   openChecklistTasks,
@@ -26,7 +25,6 @@ export function registerDashboardRoutes(app: FastifyInstance): void {
         id: ctx.organization.id,
         name: ctx.organization.name,
       },
-      mode: getAlloggiatiMode(),
     });
   });
 
@@ -94,7 +92,6 @@ export function registerDashboardRoutes(app: FastifyInstance): void {
 
     return reply.send({
       connected: credential?.lastTestOk === true,
-      mode: getAlloggiatiMode(),
       calendarCount,
       propertyCount,
     });
