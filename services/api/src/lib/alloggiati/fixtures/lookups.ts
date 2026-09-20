@@ -1,7 +1,7 @@
 /**
- * Estratto delle tabelle Alloggiati (Tabella Luoghi / Tipi_Documento).
- * In modalità live il gateway può scaricare le tabelle complete via SOAP;
- * questo fixture copre il percorso demo e la ricerca offline.
+ * Estratto delle tabelle ufficiali Alloggiati (Tabella Luoghi / Tipi_Documento).
+ * Le tabelle complete si scaricano via SOAP (metodo Tabella) con credenziali;
+ * questa copia locale serve alla ricerca nel form di check-in pubblico.
  */
 export const LOOKUP_ENTRIES = [
   { kind: "stato", code: "100000100", label: "ITALIA" },

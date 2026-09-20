@@ -97,7 +97,7 @@ export function buildStayChecklist(
         : docOk
           ? deadline.overdue
             ? "Scadenza superata — invia ora"
-            : "Prepara e invia la schedina (mock o SOAP)"
+            : "Prepara e invia la schedina"
           : "Completa prima i documenti",
       href: docOk ? "/invio" : undefined,
       urgent: alloggiatiUrgent && docOk,

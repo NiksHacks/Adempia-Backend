@@ -4,7 +4,6 @@ import { z } from "zod";
 import { prisma } from "../db.js";
 import { getAlloggiatiClient } from "../lib/alloggiati/index.js";
 import { planApartmentSync } from "../lib/alloggiati/apartment-sync.js";
-import { getAlloggiatiMode } from "../lib/alloggiati/mode.js";
 import { decryptSecret, encryptSecret } from "../lib/encryption.js";
 import { requireOrganization } from "../plugins/session.js";
 
@@ -47,7 +46,6 @@ export function registerAlloggiatiRoutes(app: FastifyInstance): void {
     }
 
     const connected = credential?.lastTestOk === true;
-    const mode = getAlloggiatiMode();
 
     let unmatched: { id: string; description: string; indirizzo: string | null }[] = [];
     if (connected && credential) {
@@ -74,7 +72,6 @@ export function registerAlloggiatiRoutes(app: FastifyInstance): void {
 
     return reply.send({
       connected,
-      mode,
       credential: {
         hasCredential: Boolean(credential),
         lastTestOk: credential?.lastTestOk ?? null,
