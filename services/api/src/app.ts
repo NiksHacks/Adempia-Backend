@@ -4,6 +4,16 @@ import Fastify, { type FastifyInstance } from "fastify";
 import { z } from "zod";
 import { prisma } from "./db.js";
 import { computeDueReminders, type ReminderStay } from "./reminders.js";
+import { registerAdempimentiRoutes } from "./routes/adempimenti.js";
+import { registerAlloggiatiRoutes } from "./routes/alloggiati.js";
+import { registerAuthRoutes } from "./routes/auth.js";
+import { registerCalendarRoutes } from "./routes/calendars.js";
+import { registerCheckInRoutes } from "./routes/check-in.js";
+import { registerDashboardRoutes } from "./routes/dashboard.js";
+import { registerInvioRoutes } from "./routes/invio.js";
+import { registerLookupRoutes } from "./routes/lookups.js";
+import { registerPropertyRoutes } from "./routes/properties.js";
+import { registerStayRoutes } from "./routes/stays.js";
 
 const OCR_SERVICE_URL = process.env.OCR_SERVICE_URL ?? "http://localhost:8000";
 
@@ -84,6 +94,17 @@ export function buildApp(): FastifyInstance {
     });
     return reply.send({ now: now.toISOString(), due });
   });
+
+  registerAuthRoutes(app);
+  registerDashboardRoutes(app);
+  registerPropertyRoutes(app);
+  registerStayRoutes(app);
+  registerInvioRoutes(app);
+  registerAlloggiatiRoutes(app);
+  registerCalendarRoutes(app);
+  registerAdempimentiRoutes(app);
+  registerCheckInRoutes(app);
+  registerLookupRoutes(app);
 
   return app;
 }
