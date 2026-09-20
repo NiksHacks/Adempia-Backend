@@ -1,0 +1,244 @@
+// Schema Postgres (Supabase). Locale: usa DATABASE_URL con il pooler Supabase.
+// Per le migrazioni: DIRECT_URL (session mode o direct connection).
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+model User {
+  id             String    @id
+  name           String
+  email          String
+  emailVerified  Boolean
+  image          String?
+  createdAt      DateTime
+  updatedAt      DateTime
+  organizationId String?
+  organization   Organization? @relation(fields: [organizationId], references: [id], onDelete: SetNull)
+  sessions       Session[]
+  accounts       Account[]
+
+  @@unique([email])
+  @@index([organizationId])
+  @@map("user")
+}
+
+model Session {
+  id        String   @id
+  expiresAt DateTime
+  token     String
+  createdAt DateTime
+  updatedAt DateTime
+  ipAddress String?
+  userAgent String?
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([token])
+  @@index([userId])
+  @@map("session")
+}
+
+model Account {
+  id                    String    @id
+  accountId             String
+  providerId            String
+  userId                String
+  user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  accessToken           String?
+  refreshToken          String?
+  idToken               String?
+  accessTokenExpiresAt  DateTime?
+  refreshTokenExpiresAt DateTime?
+  scope                 String?
+  password              String?
+  createdAt             DateTime
+  updatedAt             DateTime
+
+  @@index([userId])
+  @@map("account")
+}
+
+model Verification {
+  id         String    @id
+  identifier String
+  value      String
+  expiresAt  DateTime
+  createdAt  DateTime?
+  updatedAt  DateTime?
+
+  @@index([identifier])
+  @@map("verification")
+}
+
+model Organization {
+  id         String                @id @default(cuid())
+  name       String
+  createdAt  DateTime              @default(now())
+  updatedAt  DateTime              @updatedAt
+  users      User[]
+  credential AlloggiatiCredential?
+  properties Property[]
+  stays      GuestStay[]
+  receipts   Receipt[]
+  checklist  ComplianceChecklist?
+  calendars  ChannelCalendar[]
+  onboarding AlloggiatiOnboarding?
+}
+
+/** Passo corrente del percorso guidato per ottenere le credenziali Questura. */
+enum AlloggiatiOnboardingStep {
+  preparazione
+  invio
+  ricezione
+  wskey
+  collegamento
+}
+
+/** Stato del wizard di onboarding credenziali Alloggiati (pre-collegamento). */
+model AlloggiatiOnboarding {
+  organizationId     String                   @id
+  organization       Organization             @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  step               AlloggiatiOnboardingStep @default(preparazione)
+  /** Checklist di preparazione della richiesta. */
+  prepModulo         Boolean                  @default(false)
+  prepDocumento      Boolean                  @default(false)
+  prepAutorizzazione Boolean                  @default(false)
+  /** Momento in cui l'host dichiara di aver inviato la richiesta alla Questura. */
+  submittedAt        DateTime?
+  createdAt          DateTime                 @default(now())
+  updatedAt          DateTime                 @updatedAt
+}
+
+/** Promemoria manuali (tassa soggiorno / ISTAT). Il CIN resta derivato dagli immobili. */
+model ComplianceChecklist {
+  organizationId     String       @id
+  organization       Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  touristTaxChecked  Boolean      @default(false)
+  istatChecked       Boolean      @default(false)
+  updatedAt          DateTime     @updatedAt
+}
+
+model AlloggiatiCredential {
+  id              String       @id @default(cuid())
+  organizationId  String       @unique
+  organization    Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  utenteEnc       String
+  passwordEnc     String
+  wskeyEnc        String
+  lastTestOk      Boolean?
+  lastTestAt      DateTime?
+  lastTestMessage String?
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+}
+
+model Property {
+  id                    String            @id @default(cuid())
+  organizationId        String
+  organization          Organization      @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  name                  String
+  address               String
+  cin                   String?
+  alloggiatiApartmentId String?
+  /** Imposta di soggiorno: centesimi € / persona / notte (es. 500 = €5 Firenze demo). */
+  touristTaxPerNightCents Int             @default(500)
+  /** Cap notti tassabili (Firenze spesso 7). 0 = senza tetto. */
+  touristTaxMaxNights   Int               @default(7)
+  touristTaxExemptUnderAge Int            @default(14)
+  touristTaxCity        String            @default("Firenze")
+  createdAt             DateTime          @default(now())
+  updatedAt             DateTime          @updatedAt
+  stays                 GuestStay[]
+  calendars             ChannelCalendar[]
+
+  @@index([organizationId])
+}
+
+/** Calendario iCal esportato da Airbnb / Booking / altro (senza API partner). */
+model ChannelCalendar {
+  id              String       @id @default(cuid())
+  organizationId  String
+  organization    Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  propertyId      String
+  property        Property     @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  platform        String
+  label           String?
+  icalUrl         String
+  lastSyncAt      DateTime?
+  lastSyncOk      Boolean?
+  lastSyncMessage String?
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+
+  @@index([organizationId])
+  @@index([propertyId])
+}
+
+enum StayStatus {
+  draft
+  ready
+  sent
+  error
+}
+
+model GuestStay {
+  id                 String       @id @default(cuid())
+  organizationId     String
+  organization       Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  propertyId         String
+  property           Property     @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  guestType          String
+  lastName           String
+  firstName          String
+  sex                String
+  birthDate          DateTime
+  birthComuneCode    String       @default("")
+  birthProvince      String       @default("")
+  birthCountryCode   String
+  citizenshipCode    String
+  documentType       String       @default("")
+  documentNumber     String       @default("")
+  documentIssuePlace String       @default("")
+  arrivalDate        DateTime
+  nights             Int
+  status             StayStatus   @default(draft)
+  errorMessage       String?
+  sentAt             DateTime?
+  /** Provenienza: manual | ical | checkin */
+  source             String       @default("manual")
+  /** UID evento iCal (dedup sync) */
+  externalUid        String?
+  /** Token link pubblico check-in ospite */
+  checkInToken       String?      @unique
+  /** Imposta di soggiorno calcolata (centesimi). */
+  touristTaxCents    Int          @default(0)
+  /** due | collected | exempt | na */
+  touristTaxStatus   String       @default("due")
+  createdAt          DateTime     @default(now())
+  updatedAt          DateTime     @updatedAt
+  receipt            Receipt?
+
+  @@unique([propertyId, externalUid])
+  @@index([organizationId, arrivalDate])
+  @@index([propertyId])
+  @@index([checkInToken])
+}
+
+model Receipt {
+  id             String       @id @default(cuid())
+  stayId         String       @unique
+  stay           GuestStay    @relation(fields: [stayId], references: [id], onDelete: Cascade)
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  pdfBytes       Bytes
+  issuedAt       DateTime     @default(now())
+
+  @@index([organizationId, issuedAt])
+}
