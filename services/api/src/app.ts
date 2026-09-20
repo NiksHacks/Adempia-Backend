@@ -2,6 +2,7 @@ import cors from "@fastify/cors";
 import multipart from "@fastify/multipart";
 import Fastify, { type FastifyInstance } from "fastify";
 import { z } from "zod";
+import { prisma } from "./db.js";
 import { computeDueReminders, type ReminderStay } from "./reminders.js";
 
 const OCR_SERVICE_URL = process.env.OCR_SERVICE_URL ?? "http://localhost:8000";
@@ -29,6 +30,17 @@ export function buildApp(): FastifyInstance {
   app.register(multipart, { limits: { fileSize: 15 * 1024 * 1024 } });
 
   app.get("/health", async () => ({ status: "ok", service: "adempia-api" }));
+
+  // Database health check — verifies Supabase Postgres connectivity.
+  app.get("/health/db", async (request, reply) => {
+    try {
+      await prisma.$queryRaw`SELECT 1`;
+      return reply.send({ status: "ok", database: "connected" });
+    } catch (error) {
+      request.log.error(error);
+      return reply.code(503).send({ status: "error", database: "unreachable" });
+    }
+  });
 
   // OCR document scan — proxied to the OCR microservice. The frontend never
   // talks to the OCR service directly: everything goes through the gateway.
