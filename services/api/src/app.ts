@@ -33,6 +33,16 @@ const remindersBodySchema = z.object({
 
 const mrzTextSchema = z.object({ mrz: z.string().min(1) });
 
+/** Il servizio OCR può rispondere con corpi non-JSON (es. 500 di FastAPI). */
+async function parseOcrResponse(res: Response): Promise<unknown | null> {
+  const text = await res.text();
+  try {
+    return JSON.parse(text) as unknown;
+  } catch {
+    return null;
+  }
+}
+
 export function buildApp(): FastifyInstance {
   const app = Fastify({ logger: true });
 
@@ -63,9 +73,17 @@ export function buildApp(): FastifyInstance {
     const form = new FormData();
     form.append("file", new Blob([buffer], { type: file.mimetype }), file.filename);
 
-    const res = await fetch(`${OCR_SERVICE_URL}/ocr/mrz`, { method: "POST", body: form });
-    const payload = await res.json();
-    return reply.code(res.status).send(payload);
+    let res: Response;
+    try {
+      res = await fetch(`${OCR_SERVICE_URL}/ocr/mrz`, { method: "POST", body: form });
+    } catch (error) {
+      request.log.error(error);
+      return reply.code(502).send({ error: "Servizio OCR non raggiungibile." });
+    }
+    const payload = await parseOcrResponse(res);
+    return reply.code(payload === null ? 502 : res.status).send(
+      payload ?? { error: `Risposta OCR non valida (HTTP ${res.status}).` },
+    );
   });
 
   app.post("/ocr/mrz/text", async (request, reply) => {
@@ -73,13 +91,21 @@ export function buildApp(): FastifyInstance {
     if (!parsed.success) {
       return reply.code(400).send({ error: "Campo 'mrz' mancante." });
     }
-    const res = await fetch(`${OCR_SERVICE_URL}/ocr/mrz/text`, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify(parsed.data),
-    });
-    const payload = await res.json();
-    return reply.code(res.status).send(payload);
+    let res: Response;
+    try {
+      res = await fetch(`${OCR_SERVICE_URL}/ocr/mrz/text`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(parsed.data),
+      });
+    } catch (error) {
+      request.log.error(error);
+      return reply.code(502).send({ error: "Servizio OCR non raggiungibile." });
+    }
+    const payload = await parseOcrResponse(res);
+    return reply.code(payload === null ? 502 : res.status).send(
+      payload ?? { error: `Risposta OCR non valida (HTTP ${res.status}).` },
+    );
   });
 
   // Reminder / overdue computation for a batch of stays.
