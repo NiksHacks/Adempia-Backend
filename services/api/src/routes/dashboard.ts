@@ -2,6 +2,11 @@ import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import { prisma } from "../db.js";
 import { getAlloggiatiMode } from "../lib/alloggiati/mode.js";
+import {
+  buildStayChecklist,
+  openChecklistTasks,
+  type StayWithRelations,
+} from "../lib/stays/checklist.js";
 import { requireOrganization } from "../plugins/session.js";
 
 const complianceSchema = z.object({
@@ -46,9 +51,26 @@ export function registerDashboardRoutes(app: FastifyInstance): void {
       }),
     ]);
 
+    const now = new Date();
+    const stayRows = stays as StayWithRelations[];
+    const tasks = openChecklistTasks(stayRows, now)
+      .slice(0, 8)
+      .map(({ stay, item }) => ({
+        stayId: stay.id,
+        lastName: stay.lastName,
+        firstName: stay.firstName,
+        propertyName: stay.property.name,
+        arrivalDate: stay.arrivalDate.toISOString(),
+        item,
+      }));
+
     return reply.send({
       properties,
-      stays,
+      stays: stayRows.map((stay) => ({
+        ...stay,
+        checklist: buildStayChecklist(stay, now),
+      })),
+      tasks,
       checklist: {
         touristTaxChecked: checklist?.touristTaxChecked ?? false,
         istatChecked: checklist?.istatChecked ?? false,
